@@ -9,7 +9,7 @@ Incluye: capas **Resource → Service → Repository**, **DTOs** inmutables con 
 
 ## Modelo de datos
 
-```text
+text
 equipment (1) ----< loan >---- (1) student
   id PK                          id PK
   code                           name
