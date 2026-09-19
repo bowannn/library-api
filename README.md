@@ -2,12 +2,10 @@
 # tic-usta - Gestión de Préstamos TIC
 
 API **RESTful** de **préstamo de equipos** con Quarkus para Desarrollo Orientado a Servicios (2026-2), Semana 7.
-Contexto: el departamento de TIC de la USTA presta equipos (`equipment`) a estudiantes (`student`), registrando cada
-préstamo (`loan`) con su cantidad, fecha de préstamo y fecha de devolución.
+Contexto: el departamento de TIC de la USTA presta equipos (`equipment`) a estudiantes (`student`), registrando cada préstamo (`loan`) con su cantidad, fecha de préstamo y fecha de devolución.
 Base de datos **MySQL (XAMPP)**.
 
-Incluye: capas **Resource → Service → Repository**, **DTOs** inmutables con **Bean Validation**,
-**manejo de errores** con `ExceptionMapper` (400/404 en JSON) y **Lombok** en los modelos.
+Incluye: capas **Resource → Service → Repository**, **DTOs** inmutables con **Bean Validation**, **manejo de errores** con `ExceptionMapper` (400/404 en JSON) y **Lombok** en los modelos.
 
 ## Modelo de datos
 
@@ -207,9 +205,4 @@ quarkus.datasource.password=
 quarkus.datasource.jdbc.url=jdbc:mysql://localhost:3306/library_api
 quarkus.hibernate-orm.database.generation=update
 quarkus.hibernate-orm.database.version-check.enabled=false
-
-```
-
-```
-
 ```
