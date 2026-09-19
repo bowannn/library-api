@@ -1,56 +1,54 @@
 # library-api
 
-API **RESTful** de **Biblioteca** con Quarkus para Desarrollo Orientado a Servicios (2026-2), Semana 6.
-Contexto: **libros** (`books`) y **miembros** (`members`), donde un miembro puede tomar prestados varios libros.
+API **RESTful** de **préstamo de equipos** con Quarkus para Desarrollo Orientado a Servicios (2026-2), Semana 7.
+Contexto: el departamento de TIC de la USTA presta equipos (`equipment`) a estudiantes (`student`), registrando cada
+préstamo (`loan`) con su cantidad, fecha de préstamo y fecha de devolución.
 Base de datos **MySQL (XAMPP)**.
 
 Incluye: capas **Resource → Service → Repository**, **DTOs** inmutables con **Bean Validation**,
 **manejo de errores** con `ExceptionMapper` (400/404 en JSON) y **Lombok** en los modelos.
 
-## Cómo crear el proyecto (extensiones en el pom)
+## Modelo de datos
 
-Al crear el proyecto en [code.quarkus.io](https://code.quarkus.io) agrega estas extensiones. Si ya creaste el proyecto, añade los bloques al `pom.xml`:
-
-| Extensión en code.quarkus.io | Dependencia en el pom | Para qué |
-|---|---|---|
-| REST | `quarkus-rest` | Endpoints REST (Resource) |
-| REST Jackson | `quarkus-rest-jackson` | Serialización JSON |
-| Hibernate ORM | `quarkus-hibernate-orm` | Entidades JPA |
-| Hibernate ORM with Panache | `quarkus-hibernate-orm-panache` | Repositorios |
-| JDBC Driver - MySQL | `quarkus-jdbc-mysql` | Conexión a MySQL |
-| Hibernate Validator | `quarkus-hibernate-validator` | Bean Validation (`@NotBlank`, `@Email`, `@Min`...) |
-
-Además, **Lombok** va como dependencia normal (`provided`) en el pom:
-
-```xml
-<dependency>
-  <groupId>org.projectlombok</groupId>
-  <artifactId>lombok</artifactId>
-  <version>1.18.42</version>
-  <scope>provided</scope>
-</dependency>
 ```
+equipment (1) ----< loan >---- (1) student
+  id PK                          id PK
+  code                           name
+  name                           email
+  stock                          program
 
-Bootstrap **no** va en el pom: se carga por CDN en los HTML del `mvc` (semana 4). Para API REST no se usa.
+loan
+  id PK
+  loan_date
+  return_date        (null mientras el préstamo está activo)
+  quantity
+  equipment_id FK -> equipment.id
+  student_id   FK -> student.id
+```
 
 ## Estructura del proyecto
 
 ```
 src/main/java/usta/
 ├── model/                        <- MODELO
-│   ├── Book.java                     Entidad JPA (tabla books) + Lombok
-│   ├── BookRepository.java           Repositorio con Panache
-│   ├── Member.java                   Entidad JPA (tabla members) + préstamos + Lombok
-│   └── MemberRepository.java         Repositorio con Panache
+│   ├── Equipment.java                Entidad JPA (tabla equipment) + Lombok
+│   ├── EquipmentRepository.java      Repositorio con Panache
+│   ├── Student.java                  Entidad JPA (tabla student) + Lombok
+│   ├── StudentRepository.java        Repositorio con Panache
+│   ├── Loan.java                     Entidad JPA (tabla loan), ManyToOne a Equipment y Student
+│   └── LoanRepository.java           Repositorio con Panache
 ├── dto/                          <- DTO (records con validación)
-│   ├── BookDTO.java                  @NotBlank @Size @Min @Positive
-│   └── MemberDTO.java                @NotBlank @Email
+│   ├── EquipmentDTO.java             @NotBlank @Size @Min
+│   ├── StudentDTO.java               @NotBlank @Email
+│   └── LoanDTO.java                  @NotNull @Min
 ├── service/                      <- SERVICE (reglas de negocio)
-│   ├── BookService.java              CRUD + control de stock
-│   └── MemberService.java            CRUD + prestar / devolver
+│   ├── EquipmentService.java         CRUD + bloquea borrado si tiene préstamos
+│   ├── StudentService.java           CRUD + bloquea borrado si tiene préstamos
+│   └── LoanService.java              CRUD + control de stock + devolución
 ├── resource/                     <- RESOURCE (endpoints REST JSON)
-│   ├── BookResource.java
-│   └── MemberResource.java
+│   ├── EquipmentResource.java
+│   ├── StudentResource.java
+│   └── LoanResource.java
 └── exception/                    <- MANEJO DE ERRORES
     ├── ValidationExceptionMapper.java    400 (Bean Validation)
     ├── BadRequestExceptionMapper.java    400 (reglas de negocio)
@@ -67,36 +65,45 @@ src/main/java/usta/
 
 ## Endpoints
 
-### Libros - `http://localhost:8080/api/books`
+### Equipos - `http://localhost:8080/api/equipment`
 
 | Método | Ruta | Descripción | Cuerpo (JSON) |
 |--------|------|-------------|---------------|
-| GET | `/api/books` | Listar libros | - |
-| GET | `/api/books/{id}` | Obtener uno | - |
-| POST | `/api/books` | Crear | `{"title":"Clean Code","author":"Robert Martin","isbn":"9780132350884","price":45.00,"stock":10}` |
-| PUT | `/api/books/{id}` | Actualizar | `{"title":"Clean Code 2ed","author":"R. Martin","isbn":"9780132350884","price":48.00,"stock":8}` |
-| DELETE | `/api/books/{id}` | Eliminar | - |
+| GET | `/api/equipment` | Listar equipos | - |
+| GET | `/api/equipment/{id}` | Obtener uno | - |
+| POST | `/api/equipment` | Crear | `{"code":"EQ-001","name":"Portátil Dell","stock":5}` |
+| PUT | `/api/equipment/{id}` | Actualizar | `{"code":"EQ-001","name":"Portátil Dell 14\"","stock":4}` |
+| DELETE | `/api/equipment/{id}` | Eliminar (falla si tiene préstamos) | - |
 
-### Miembros - `http://localhost:8080/api/members`
+### Estudiantes - `http://localhost:8080/api/students`
 
 | Método | Ruta | Descripción | Cuerpo (JSON) |
 |--------|------|-------------|---------------|
-| GET | `/api/members` | Listar miembros | - |
-| GET | `/api/members/{id}` | Obtener uno | - |
-| POST | `/api/members` | Crear | `{"name":"Ana Pérez","email":"ana@correo.com"}` |
-| PUT | `/api/members/{id}` | Actualizar | `{"name":"Ana","email":"ana2@correo.com"}` |
-| POST | `/api/members/{id}/books/{bookId}` | Prestar libro | - |
-| DELETE | `/api/members/{id}/books/{bookId}` | Devolver libro | - |
-| DELETE | `/api/members/{id}` | Eliminar | - |
+| GET | `/api/students` | Listar estudiantes | - |
+| GET | `/api/students/{id}` | Obtener uno | - |
+| POST | `/api/students` | Crear | `{"name":"Ana Pérez","email":"ana@correo.com","program":"Ingeniería de Sistemas"}` |
+| PUT | `/api/students/{id}` | Actualizar | `{"name":"Ana Pérez","email":"ana2@correo.com","program":"Ingeniería de Sistemas"}` |
+| DELETE | `/api/students/{id}` | Eliminar (falla si tiene préstamos) | - |
 
-## Préstamo de libros (stock)
+### Préstamos - `http://localhost:8080/api/loans`
 
-| Acción | Ruta | Efecto en el stock | Errores posibles |
-|--------|------|--------------------|------------------|
-| Prestar | `POST /api/members/{id}/books/{bookId}` | **Resta 1** al stock del libro | `400` sin stock o si ya lo tiene prestado · `404` si el libro o el miembro no existe |
-| Devolver | `DELETE /api/members/{id}/books/{bookId}` | **Suma 1** al stock del libro | `400` si el miembro no lo tiene prestado · `404` si el libro o el miembro no existe |
+| Método | Ruta | Descripción | Cuerpo (JSON) |
+|--------|------|-------------|---------------|
+| GET | `/api/loans` | Listar préstamos | - |
+| GET | `/api/loans/{id}` | Obtener uno | - |
+| POST | `/api/loans` | Crear (resta stock) | `{"loanDate":"2026-09-19","quantity":1,"equipmentId":1,"studentId":1}` |
+| PUT | `/api/loans/{id}` | Actualizar cantidad/fecha (solo si activo) | `{"loanDate":"2026-09-19","quantity":2,"equipmentId":1,"studentId":1}` |
+| PUT | `/api/loans/{id}/devolver` | Marcar como devuelto (suma stock) | - |
+| DELETE | `/api/loans/{id}` | Eliminar (si estaba activo, repone stock) | - |
 
-* Si se elimina un libro que está prestado, se quita primero de los préstamos de los miembros (`member_books`) y luego se borra.
+## Reglas de negocio (stock y validaciones)
+
+| Acción | Efecto en el stock | Errores posibles |
+|--------|--------------------|------------------|
+| Crear préstamo | **Resta** `quantity` al stock del equipo | `400` sin stock suficiente · `404` si el equipo o el estudiante no existe |
+| Devolver préstamo | **Suma** `quantity` al stock del equipo | `400` si ya fue devuelto · `404` si el préstamo no existe |
+| Eliminar préstamo activo | **Suma** `quantity` al stock del equipo | `404` si el préstamo no existe |
+| Eliminar equipo/estudiante | - | `400` si tiene préstamos asociados |
 
 ## Validación y manejo de errores
 
@@ -104,50 +111,44 @@ src/main/java/usta/
 
 | Campo | Validación |
 |-------|-----------|
-| `title`, `author`, `isbn` (Book) | `@NotBlank`, `@Size(max = ...)` |
-| `stock` (Book) | `@NotNull`, `@Min(0)` |
-| `price` (Book) | `@NotNull`, `@Positive` |
-| `name` (Member) | `@NotBlank`, `@Size(max = 100)` |
-| `email` (Member) | `@NotBlank`, `@Email` |
+| `code`, `name` (Equipment) | `@NotBlank`, `@Size(max = ...)` |
+| `stock` (Equipment) | `@NotNull`, `@Min(0)` |
+| `name`, `program` (Student) | `@NotBlank`, `@Size(max = ...)` |
+| `email` (Student) | `@NotBlank`, `@Email` |
+| `loanDate` (Loan) | `@NotNull` |
+| `quantity` (Loan) | `@NotNull`, `@Min(1)` |
+| `equipmentId`, `studentId` (Loan) | `@NotNull` |
 
 En los Resource se usa `@Valid` para activar la validación antes de entrar al método.
 
 **Respuestas de error (JSON uniforme):**
 
 ```json
-{"error":"El título es obligatorio"}       // 400 (Bean Validation)
-{"error":"Sin stock disponible para el libro: Clean Code"}  // 400 (regla de negocio)
-{"error":"Libro no encontrado"}            // 404
+{"error":"El código es obligatorio"}                          // 400 (Bean Validation)
+{"error":"Sin stock disponible para el equipo: Portátil Dell"} // 400 (regla de negocio)
+{"error":"Equipo no encontrado"}                               // 404
 ```
 
-## Cómo crear y editar un libro y un miembro
+## Cómo probar en Postman
 
-En Postman usa **Body → raw → JSON** con estos cuerpos:
-
-**Crear libro** `POST /api/books`
+**Crear equipo** `POST /api/equipment`
 ```json
-{"title":"Clean Code","author":"Robert Martin","isbn":"9780132350884","price":45.00,"stock":10}
+{"code":"EQ-001","name":"Portátil Dell","stock":5}
 ```
 
-**Crear miembro** `POST /api/members`
+**Crear estudiante** `POST /api/students`
 ```json
-{"name":"Ana Pérez","email":"ana@correo.com"}
+{"name":"Ana Pérez","email":"ana@correo.com","program":"Ingeniería de Sistemas"}
 ```
 
-**Editar libro** `PUT /api/books/1`
+**Crear préstamo** `POST /api/loans`
 ```json
-{"title":"Clean Code 2da Ed.","author":"Robert Martin","isbn":"9780132350884","price":48.00,"stock":8}
+{"loanDate":"2026-09-19","quantity":1,"equipmentId":1,"studentId":1}
 ```
 
-**Editar miembro** `PUT /api/members/1`
-```json
-{"name":"Ana García","email":"ana.garcia@correo.com"}
-```
+**Devolver préstamo** `PUT /api/loans/1/devolver` (sin cuerpo JSON)
 
-**Prestar un libro** `POST /api/members/1/books/1` (sin cuerpo JSON)
-**Devolver un libro** `DELETE /api/members/1/books/1` (sin cuerpo JSON)
-
-> Para el `id`, primero haz `GET /api/books` o `/api/members` y toma el `id` de la lista.
+> Para el `id`, primero haz `GET /api/equipment`, `/api/students` o `/api/loans` y toma el `id` de la lista.
 
 ## Códigos HTTP usados
 
@@ -167,7 +168,7 @@ Requisitos: JDK 21, Maven (o `./mvnw`) y **XAMPP con MySQL corriendo**.
 2. Crear la base de datos (phpMyAdmin o consola):
 
    ```sql
-   CREATE DATABASE library;
+   CREATE DATABASE library_api;
    ```
 
 3. Ejecutar la aplicación:
@@ -177,8 +178,8 @@ Requisitos: JDK 21, Maven (o `./mvnw`) y **XAMPP con MySQL corriendo**.
    ```
 
 4. Probar con **Postman** o el navegador:
-   * `GET http://localhost:8080/api/books` -> `[]`
-   * `POST http://localhost:8080/api/books` con Body JSON -> crea y devuelve `201`.
+   * `GET http://localhost:8080/api/equipment` -> `[]`
+   * `POST http://localhost:8080/api/equipment` con Body JSON -> crea y devuelve `201`.
 
 ## Configuración de la base de datos
 
@@ -188,7 +189,7 @@ En `src/main/resources/application.properties`:
 quarkus.datasource.db-kind=mysql
 quarkus.datasource.username=root
 quarkus.datasource.password=
-quarkus.datasource.jdbc.url=jdbc:mysql://localhost:3306/library
+quarkus.datasource.jdbc.url=jdbc:mysql://localhost:3306/library_api
 quarkus.hibernate-orm.database.generation=update
 quarkus.hibernate-orm.database.version-check.enabled=false
 ```
